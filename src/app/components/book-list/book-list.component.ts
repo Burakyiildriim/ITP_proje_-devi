@@ -10,6 +10,7 @@ import { BookService, Book } from '../../services/book.service';
 import { AuthService } from '../../services/auth.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Subscription } from 'rxjs';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-book-list',
@@ -123,7 +124,8 @@ export class BookListComponent implements OnInit, OnDestroy {
   constructor(
     private bookService: BookService,
     private authService: AuthService,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private router: Router
   ) {}
 
   ngOnInit() {
@@ -195,8 +197,8 @@ export class BookListComponent implements OnInit, OnDestroy {
   }
 
   onEdit(book: Book) {
-    // TODO: Implement edit functionality
-    console.log('Edit book:', book);
+    // Yönetici kitap düzenleme için admin paneline yönlendirilsin
+    this.router.navigate(['/admin'], { queryParams: { edit: book.id } });
   }
 
   async onDelete(book: Book) {

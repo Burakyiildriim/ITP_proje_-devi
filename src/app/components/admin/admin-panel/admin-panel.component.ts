@@ -9,6 +9,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { BookService, Book } from '../../../services/book.service';
+import { ActivatedRoute, Router } from '@angular/router';
 
 @Component({
   selector: 'app-admin-panel',
@@ -28,8 +29,8 @@ import { BookService, Book } from '../../../services/book.service';
       <h2>Kitap Yönetimi</h2>
       
       <div class="add-book-form">
-        <h3>Yeni Kitap Ekle</h3>
-        <form (ngSubmit)="addBook()" #bookForm="ngForm">
+        <h3>{{ editingBook ? 'Kitap Düzenle' : 'Yeni Kitap Ekle' }}</h3>
+        <form (ngSubmit)="editingBook ? updateBook() : addBook()" #bookForm="ngForm">
           <mat-form-field appearance="outline">
             <mat-label>Kitap Adı</mat-label>
             <input matInput [(ngModel)]="newBook.title" name="title" required>
@@ -54,10 +55,17 @@ import { BookService, Book } from '../../../services/book.service';
             </mat-error>
           </mat-form-field>
 
-          <button mat-raised-button color="primary" type="submit" 
-                  [disabled]="!bookForm.form.valid || isAdding">
-            {{ isAdding ? 'Kitap Ekleniyor...' : 'Kitap Ekle' }}
-          </button>
+          <div class="button-group">
+            <button mat-raised-button color="primary" type="submit" 
+                    [disabled]="!bookForm.form.valid || isAdding">
+              {{ isAdding ? 'İşlem Yapılıyor...' : (editingBook ? 'Güncelle' : 'Kitap Ekle') }}
+            </button>
+            <button mat-raised-button color="warn" type="button" 
+                    *ngIf="editingBook"
+                    (click)="cancelEdit()">
+              İptal
+            </button>
+          </div>
         </form>
       </div>
 
@@ -92,6 +100,9 @@ import { BookService, Book } from '../../../services/book.service';
           <ng-container matColumnDef="actions">
             <th mat-header-cell *matHeaderCellDef>İşlemler</th>
             <td mat-cell *matCellDef="let book">
+              <button mat-icon-button color="primary" (click)="editBook(book)">
+                <mat-icon>edit</mat-icon>
+              </button>
               <button mat-icon-button color="warn" (click)="deleteBook(book)" [disabled]="isDeleting">
                 <mat-icon>delete</mat-icon>
               </button>
@@ -125,13 +136,17 @@ import { BookService, Book } from '../../../services/book.service';
       width: 100%;
     }
     .mat-column-actions {
-      width: 80px;
+      width: 120px;
       text-align: center;
     }
     .loading-spinner {
       text-align: center;
       padding: 20px;
       color: #666;
+    }
+    .button-group {
+      display: flex;
+      gap: 10px;
     }
   `]
 })
@@ -143,6 +158,7 @@ export class AdminPanelComponent implements OnInit {
     author: '',
     isbn: ''
   };
+  editingBook: Book | null = null;
   isLoading: boolean = false;
   isAdding: boolean = false;
   isDeleting: boolean = false;
@@ -150,11 +166,23 @@ export class AdminPanelComponent implements OnInit {
   constructor(
     private bookService: BookService,
     private dialog: MatDialog,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private route: ActivatedRoute,
+    private router: Router
   ) {}
 
   ngOnInit() {
     this.loadBooks();
+    // URL'den kitap ID'sini kontrol et
+    this.route.queryParams.subscribe(params => {
+      if (params['edit']) {
+        const bookId = params['edit'];
+        const book = this.books.find(b => b.id === bookId);
+        if (book) {
+          this.editBook(book);
+        }
+      }
+    });
   }
 
   async loadBooks() {
@@ -166,6 +194,48 @@ export class AdminPanelComponent implements OnInit {
       this.snackBar.open('Kitaplar yüklenirken bir hata oluştu.', 'Kapat', { duration: 5000 });
     } finally {
       this.isLoading = false;
+    }
+  }
+
+  editBook(book: Book) {
+    this.editingBook = book;
+    this.newBook = { ...book };
+    // Sayfayı form bölümüne kaydır
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  cancelEdit() {
+    this.editingBook = null;
+    this.newBook = {
+      title: '',
+      author: '',
+      isbn: ''
+    };
+    // URL'den edit parametresini kaldır
+    this.router.navigate(['/admin']);
+  }
+
+  async updateBook() {
+    if (this.isAdding || !this.editingBook) return;
+    
+    this.isAdding = true;
+    try {
+      await this.bookService.updateBook(this.editingBook.id!, this.newBook);
+      this.editingBook = null;
+      this.newBook = {
+        title: '',
+        author: '',
+        isbn: ''
+      };
+      await this.loadBooks();
+      this.snackBar.open('Kitap başarıyla güncellendi.', 'Kapat', { duration: 3000 });
+      // URL'den edit parametresini kaldır
+      this.router.navigate(['/admin']);
+    } catch (error) {
+      console.error('Error updating book:', error);
+      this.snackBar.open('Kitap güncellenirken bir hata oluştu.', 'Kapat', { duration: 5000 });
+    } finally {
+      this.isAdding = false;
     }
   }
 
